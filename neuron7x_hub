@@ -1,124 +1,184 @@
-```
-neuron7x_hub/
-├── neuron7x/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── quantum_encoder.py
-│   ├── harmonic_engine.py
-│   ├── neurochemistry.py
-│   ├── bioprocessor.py
-│   ├── personality.py
-│   └── utils/
-│       ├── logger.py
-│       └── validator.py
-├── tests/
-│   ├── __init__.py
-│   ├── test_encoder.py
-│   ├── test_harmonics.py
-│   └── test_integration.py
-├── examples/
-│   ├── basic_usage.py
-│   └── psychedelic_sim.py
-├── docs/
-│   ├── api_reference.md
-│   └── neuroscience_background.md
-├── setup.py
-├── requirements.txt
-├── LICENSE
-├── MANIFEST.in
-├── .gitignore
-├── pyproject.toml
-└── README.md
-```
+import numpy as np
+from typing import Dict, List, Deque, Tuple
+from collections import deque
+import logging
+from math import sin, cos, pi, sqrt, exp
+import json
+from dataclasses import dataclass, field
+from sklearn.metrics.pairwise import cosine_similarity
+import hashlib
 
-```
-# setup.py
-from setuptools import setup, find_packages
+# === CONFIGURATION ===
+@dataclass
+class NeuroConfig:
+    DIM: int = 512
+    MEMORY_DECAY: float = 0.97
+    SHU_ALPHA: float = 0.618
+    DECISION_THRESHOLD: float = 0.35
+    NEUROTRANSMITTER_BASELINE: Dict[str, float] = field(
+        default_factory=lambda: {
+            "serotonin": 1.0,
+            "dopamine": 1.0,
+            "GABA": 1.0,
+            "glutamate": 1.0
+        }
+    )
 
-setup(
-    name="neuron7x_hub",
-    version="3.1.0",
-    packages=find_packages(),
-    install_requires=[
-        'numpy>=1.21.0',
-        'scikit-learn>=1.0.0',
-        'pytest>=7.0.0'
-    ],
-    author="Neuro Labs Collective",
-    description="Bio-inspired cognitive architecture with quantum neurodynamics",
-    long_description=open('README.md').read(),
-    long_description_content_type="text/markdown",
-    url="https://github.com/neuro-labs/neuron7x-hub",
-    classifiers=[
-        "Programming Language :: Python :: 3.9",
-        "License :: OSI Approved :: MIT License",
-        "Operating System :: OS Independent",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "Topic :: Scientific/Engineering :: Bio-Informatics"
-    ],
-    python_requires='>=3.9'
-)
-```
+# === QUANTUM VECTOR ENCODING ===
+class QuantumEncoder:
+    def __init__(self, embeddings: Dict[str, np.ndarray], config: NeuroConfig):
+        self.base_emb = embeddings
+        self.oov_cache = {}
+        self.config = config
 
-```
-# requirements.txt
-numpy>=1.21.0
-scikit-learn>=1.0.0
-pytest>=7.0.0
-```
+    def _quantum_hash(self, token: str) -> np.ndarray:
+        seed = int(hashlib.sha256(token.encode()).hexdigest()[:8], 16)
+        rng = np.random.RandomState(seed)
+        return rng.normal(0, 1/sqrt(self.config.DIM), self.config.DIM)
 
-```
-# MANIFEST.in
-include LICENSE
-include README.md
-recursive-include docs *
-recursive-include examples *
-```
+    def encode(self, concept: str) -> np.ndarray:
+        vec = self.base_emb.get(concept, self._quantum_hash(concept))
+        return vec / (np.linalg.norm(vec) + 1e-8)
 
-```
-# .gitignore
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.swp
-.env
-.venv
-.idea/
-*.egg-info/
-dist/
-build/
-```
+# === HARMONIC OPTIMIZATION ===
+class ShuHarmonicEngine:
+    def __init__(self, config: NeuroConfig):
+        self.weights = np.array([
+            [sin(pi/3*i)*cos(pi/3*j) for j in range(3)]
+            for i in range(3)
+        ])
+        self.alpha = config.SHU_ALPHA
 
-```
-# pyproject.toml
-[build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
-```
+    def evaluate(self, matrix: np.ndarray) -> float:
+        return np.tanh(np.sum(self.weights * matrix) * self.alpha)
 
-```
-# README.md
-# Neuron7x Hub
+# === NEUROPHYSIOLOGY ===
+class NeurochemicalState:
+    def __init__(self, config: NeuroConfig):
+        self.nt = config.NEUROTRANSMITTER_BASELINE.copy()
+        self.hormones = {"BDNF": 1.0, "cortisol": 1.0}
+        self.receptors = {"5HT2A": 0.5, "NMDA": 0.7}
 
-Modular cognitive architecture combining bio-neurochemical simulation, memory encoding, harmonic reasoning and quantum vectorization.
+    def modulate(self, nt: str, factor: float):
+        self.nt[nt] = np.clip(self.nt[nt] * factor, 0, 5.0)
 
-## Installation
-pip install neuron7x-hub
+    def update_receptors(self, receptor: str, delta: float):
+        self.receptors[receptor] = np.clip(
+            self.receptors[receptor] + delta, 0, 1.5)
 
-## Documentation
-See `/docs` folder or generate with:
-pdoc --html neuron7x -o docs/
+# === MEMORY AND PERSONALITY ===
+class BioMemory:
+    def __init__(self, harmonic: ShuHarmonicEngine, config: NeuroConfig):
+        self.assoc = {}
+        self.performance = {}
+        self.harmonic = harmonic
+        self.decay = config.MEMORY_DECAY
 
-## License
-MIT
-```
+    def store(self, key: str, vec: np.ndarray, reward: float):
+        if key not in self.assoc:
+            self.assoc[key] = deque(maxlen=10)
+        self.assoc[key].append(vec)
+        self.performance[key] = np.clip(
+            self.performance.get(key, 0.0) * self.decay + reward, -1, 1)
 
-```
-# LICENSE
-MIT License
+    def recall(self, key: str) -> Tuple[float, float]:
+        vectors = list(self.assoc.get(key, []))
+        if len(vectors) < 3:
+            return 0.0, self.performance.get(key, 0.0)
+        matrix = np.array([v[:3] for v in vectors[:3]])
+        return self.harmonic.evaluate(matrix), self.performance[key]
 
-Copyright (c) 2024 Neuro Labs Collective
+class PersonalityProfile:
+    def __init__(self, name: str, traits: Dict[str, float]):
+        self.name = name
+        self.traits = {k: np.clip(v, -1, 1) for k,v in traits.items()}
 
-Permission is hereby granted, free of charge, to any person obtaining a copy...
-```
+    def match(self, context: Dict[str, float]) -> float:
+        return sum(
+            self.traits.get(t, 0) * context.get(t, 0)
+            for t in context
+        )
+
+# === MAIN ENGINE ===
+class BioQuantumEngine:
+    def __init__(self, config: NeuroConfig):
+        self.config = config
+        self.harmonic = ShuHarmonicEngine(config)
+        self.memory = BioMemory(self.harmonic, config)
+        self.chemistry = NeurochemicalState(config)
+        self.personalities = []
+
+    def add_personality(self, profile: PersonalityProfile):
+        self.personalities.append(profile)
+
+    def decide(self, context: Dict[str, float], concept: str) -> Tuple[str, dict]:
+        state_scores = {p.name: p.match(context) for p in self.personalities}
+        active_state = max(state_scores, key=state_scores.get)
+
+        harmonic, perf = self.memory.recall(concept)
+        chem_factor = 1 + 0.5*self.chemistry.receptors["5HT2A"]
+
+        score = (0.4*harmonic + 0.3*perf + 0.3*state_scores[active_state]) * chem_factor
+        action = concept if score > self.config.DECISION_THRESHOLD else "hold"
+
+        return action, {
+            "action": action,
+            "score": score,
+            "personality": active_state,
+            "harmonic": harmonic,
+            "performance": perf,
+            "chemistry": {
+                "serotonin": self.chemistry.nt["serotonin"],
+                "5HT2A": self.chemistry.receptors["5HT2A"]
+            }
+        }
+
+# === PSYCHEDELIC SIMULATION ===
+def simulate_psychedelic(engine: BioQuantumEngine, dose_mg: float):
+    engine.chemistry.modulate("serotonin", 1 + dose_mg/20)
+    engine.chemistry.update_receptors("5HT2A", dose_mg/50)
+
+    for key in engine.memory.assoc:
+        engine.memory.performance[key] *= 1.2
+
+# === TESTING ===
+def test_integrated_system():
+    config = NeuroConfig()
+    engine = BioQuantumEngine(config)
+
+    embeddings = {"opportunity": np.random.rand(config.DIM)}
+    encoder = QuantumEncoder(embeddings, config)
+    engine.memory.store("buy", encoder.encode("opportunity"), 0.7)
+
+    simulate_psychedelic(engine, 25.0)
+
+    decision, meta = engine.decide(
+        {"risk": 0.8, "novelty": 0.9},
+        "opportunity"
+    )
+
+    assert decision in ["buy", "hold"]
+    assert 0 <= meta["score"] <= 2.0
+    print("\u2705 Integration test passed")
+
+if __name__ == "__main__":
+    test_integrated_system()
+
+    config = NeuroConfig()
+    engine = BioQuantumEngine(config)
+
+    engine.add_personality(
+        PersonalityProfile("trader", {"risk": 0.9, "speed": 0.8})
+    )
+    engine.add_personality(
+        PersonalityProfile("analyst", {"precision": 0.9, "risk": -0.5})
+    )
+
+    simulate_psychedelic(engine, 20.0)
+    decision, report = engine.decide(
+        {"risk": 0.7, "novelty": 0.6},
+        "opportunity"
+    )
+
+    print("\nFinal report:")
+    print(json.dumps(report, indent=2))
